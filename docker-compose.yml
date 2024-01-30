@@ -1,0 +1,108 @@
+version: '3'
+
+services:
+  nginx:
+    image: nginx:latest
+    container_name: ${APP_NAME}-nginx
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      - "./nginx/:/etc/nginx/conf.d/"
+      - "./certs/:/etc/certs/"
+    environment:
+      - "NGINX_ENVSUBST_TEMPLATE_SUFFIX=.conf"
+      - "DOMAIN=${DOMAIN}"
+    depends_on:
+      - wordpress
+    links:
+      - wordpress
+    networks:
+      - default
+    restart: always
+
+  wordpress:
+    image: wordpress:latest
+    container_name: ${APP_NAME}-wp
+    ports:
+      - ${PORT}:80
+    volumes:
+      - ./wp-app:/var/www/html:rw,cached
+      - ./config/php.ini:/usr/local/etc/php/conf.d/php.ini
+      #- ./plugin-name/trunk/:/var/www/html/wp-content/plugins/plugin-name # Plugin development
+      #- ./theme-name/trunk/:/var/www/html/wp-content/themes/theme-name # Theme development
+    environment:
+      # db-host是mysql容器名称
+      WORDPRESS_DB_HOST: "${DB_HOST}"
+      WORDPRESS_DB_NAME: "${DB_NAME}"
+      WORDPRESS_DB_USER: root
+      WORDPRESS_DB_PASSWORD: "${DB_ROOT_PASSWORD}"
+    depends_on:
+      - mysqldb
+    links:
+      - mysqldb
+    networks:
+      - default
+    hostname: ${APP_NAME}-wp
+    restart: always
+
+  mysqldb:
+    image: mysql:5.7
+    container_name: ${APP_NAME}-mysql
+    ports:
+      - 3306:3306 # change ip if required
+    command: [
+        '--default_authentication_plugin=mysql_native_password',
+        '--character-set-server=utf8mb4',
+        '--collation-server=utf8mb4_unicode_ci'
+    ]
+    volumes:
+      - ./wp-data:/docker-entrypoint-initdb.d
+      - ./db_data:/var/lib/mysql
+    environment:
+      MYSQL_DATABASE: "${DB_NAME}"
+      MYSQL_ROOT_PASSWORD: "${DB_ROOT_PASSWORD}"
+    networks:
+      - default
+    hostname: ${APP_NAME}-mysql
+    restart: always
+
+  phpmyadmin:
+    image: phpmyadmin:latest
+    container_name: ${APP_NAME}-phpmyadmin
+    volumes:
+      - ./config/phpmyadmin.ini:/usr/local/etc/php/conf.d/phpmyadmin.ini
+    environment:
+      PMA_HOST: "${DB_HOST}"
+      PMA_PORT: 3306
+      MYSQL_ROOT_PASSWORD: "${DB_ROOT_PASSWORD}"
+      UPLOAD_LIMIT: 50M
+    ports:
+      - 8080:80
+    links:
+      - mysqldb
+    networks:
+      - default
+    hostname: ${APP_NAME}-phpmyadmin
+    restart: always
+
+  wpcli:
+    image: wordpress:cli
+    volumes:
+      - ./config/php.ini:/usr/local/etc/php/conf.d/conf.ini
+      - ./wp-app:/var/www/html
+    environment:
+      WORDPRESS_DB_HOST: "${DB_HOST}"
+      WORDPRESS_DB_NAME: "${DB_NAME}"
+      WORDPRESS_DB_USER: root
+      WORDPRESS_DB_PASSWORD: "${DB_ROOT_PASSWORD}"
+    depends_on:
+      - mysqldb
+      - wordpress
+    networks:
+      - default
+    hostname: ${APP_NAME}-cli
+
+networks:
+  default:
+      driver: bridge

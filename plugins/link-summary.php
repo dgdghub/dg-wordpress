@@ -8,6 +8,8 @@ Author: nms
 Author URI: ''
 */
 
+// 将如下代码，放在 wordpress 的插件目录中：html/wp-content/plugins/link-summary.php​
+
 // 在文章内容末尾添加超链接汇总
 function append_links_to_content($content) {
     // 获取文章内容
